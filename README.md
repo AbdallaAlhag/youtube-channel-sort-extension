@@ -1,1 +1,1 @@
-# YouTube Channel Query Sort Chrome Extension
+# YouTube Channel Sort Chrome Extension
