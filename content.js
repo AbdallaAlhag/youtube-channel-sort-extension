@@ -36,43 +36,25 @@ function handleRouteChange() {
 
 handleRouteChange(); // initial load, first time we load up any youtube links, whether homepage or channel search
 
-window.addEventListener("yt-navigate-finish", handleRouteChange);
+window.addEventListener("yt-navigate-finish", () => {
+  console.log("yt navigate finish ", location.href);
+  handleRouteChange();
+});
 
 const observer = new MutationObserver(() => {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
     // onUrlChange();
-    console.log("url changed");
+    console.log("url changed, coming from MutationObserver");
 
     handleRouteChange(); // everytime we land on a channel search query.
   }
 });
 
-observer.observe(document.body, { childList: true, subtree: true });
-
-function createButton(name) {
-  const btn = document.createElement("button");
-  btn.innerHTML = name;
-  btn.style.fontFamily = "Roboto, Arial, sans-serif";
-  btn.style.fontSize = "14px";
-  btn.style.lineHeight = "20px";
-  btn.style.fontWeight = "500";
-  btn.style.letterSpacing = "normal";
-  btn.style.textColor = "#0f0f0f";
-  btn.style.backgroundColor = "#f1f1f1";
-  btn.style.borderRadius;
-  return btn;
-}
+observer.observe(document.documentElement, { childList: true, subtree: true });
 
 function setUpButtons() {
-  let latestBtn = createButton("Latest");
-  let popularBtn = createButton("Popular");
-  let oldestBtn = createButton("Oldest");
-
-  let container = createContainer();
-  container.appendChild(latestBtn);
-  container.appendChild(popularBtn);
-  container.appendChild(oldestBtn);
+  const container = createContainer();
   // const videoContainer = document.querySelector(
   //   "ytd-two-column-browse-results-renderer",
   // );
@@ -81,21 +63,103 @@ function setUpButtons() {
   const videoContainer = [
     ...document.querySelectorAll("ytd-two-column-browse-results-renderer"),
   ];
-  if (!videoContainer) return;
-  console.log("videoContainer", videoContainer);
-  videoContainer.insertBefore(container, videoContainer.firstChild);
+  if (videoContainer.length === 0) {
+    console.log("no video container");
+    return;
+  }
+  console.log("videoContainer", videoContainer[0]);
+  let primaryContainer = videoContainer[0].firstElementChild;
+  primaryContainer.insertBefore(container, primaryContainer.firstChild);
   console.log("setup complete");
 }
 
 function createContainer() {
+  // Host element (lives in YouTube DOM)
+  const host = document.createElement("div");
+  host.id = "yt-channel-sort-ui";
+
+  // Shadow root (isolated)
+  const shadow = host.attachShadow({ mode: "open" });
+
+  // Styles (moved from style.css)
+  const style = document.createElement("style");
+  style.textContent = `
+    :host {
+      all: initial;
+      font-family: Roboto, Arial, sans-serif;
+    }
+
+    .button-container {
+      display: flex;
+      gap: 8px;
+      background-color: #0f0f0f;
+      padding: 8px;
+      border-radius: 8px;
+      width: fit-content;
+    }
+
+    .sort-button {
+      all: unset;
+      font-family: Roboto, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 20px;
+      font-weight: 500;
+      letter-spacing: 0;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+
+      background-color: #272727;
+      color: #f1f1f1;
+    }
+
+    .sort-button:hover {
+      background-color: #3f3f3f;
+    }
+
+    .sort-button.active {
+      background-color: #f1f1f1;
+      color: #0f0f0f;
+    }
+
+    .sort-button.active:hover {
+      background-color: #e5e5e5;
+    }
+  `;
+
+  // Container
   const container = document.createElement("div");
-  container.id = "yt-channel-sort-ui";
-  container.style.fontFamily = "Roboto, Arial, sans-serif";
-  container.style.fontSize = "10px";
-  container.style.lineHeight = "normal";
-  container.style.fontWeight = "400";
-  container.style.letterSpacing = "normal";
-  container.style.textColor = "#000000";
-  container.style.backgroundColor = "#0f0f0f";
-  return container;
+  container.className = "button-container";
+
+  // Buttons
+  const latestBtn = createButton("Latest", true, shadow);
+  const popularBtn = createButton("Popular", false, shadow);
+  const oldestBtn = createButton("Oldest", false, shadow);
+
+  container.append(latestBtn, popularBtn, oldestBtn);
+
+  // Attach to shadow root
+  shadow.append(style, container);
+
+  return host;
+}
+
+function createButton(name, isActive = false, shadowRoot) {
+  const btn = document.createElement("button");
+  btn.textContent = name;
+  btn.className = "sort-button";
+
+  if (isActive) {
+    btn.classList.add("active");
+  }
+
+  btn.addEventListener("click", () => {
+    // ONLY query inside this shadow root
+    const allButtons = shadowRoot.querySelectorAll(".sort-button");
+    allButtons.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+  });
+
+  return btn;
 }
