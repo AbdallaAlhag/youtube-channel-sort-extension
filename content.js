@@ -19,11 +19,20 @@ function onChannelSearchPage() {
   const videoContainer = document.querySelector(
     "ytd-two-column-browse-results-renderer",
   );
-  const videoElements = [...document.querySelectorAll("ytd-video-renderer")];
-  // parent element of invidial video elemnts = div.id= "contents"
-
-  setUpButtons();
   // inject UI here
+  // setTimeout(setUpButtons, 1000); // only problem is that this can be called twice if not intialized quickly
+  setUpButtons(); // while this gets called a little to fast lol
+
+  // const videoElements = [...document.querySelectorAll("ytd-video-renderer")];
+  // let videoElements;
+  // setTimeout(() => {
+  //   videoElements = document.querySelectorAll("ytd-video-renderer");
+  //   console.log("videoElements", videoElements.length);
+  // }, 2000);
+  waitForVideos((videos) => {
+    console.log("STABLE video count:", videos.length);
+  });
+  // grab current videos.
 }
 
 function handleRouteChange() {
@@ -133,11 +142,12 @@ function createContainer() {
   container.className = "button-container";
 
   // Buttons
-  const latestBtn = createButton("Latest", true, shadow);
+  const defaultBtn = createButton("Default", true, shadow);
+  const latestBtn = createButton("Latest", false, shadow);
   const popularBtn = createButton("Popular", false, shadow);
   const oldestBtn = createButton("Oldest", false, shadow);
 
-  container.append(latestBtn, popularBtn, oldestBtn);
+  container.append(defaultBtn, latestBtn, popularBtn, oldestBtn);
 
   // Attach to shadow root
   shadow.append(style, container);
@@ -162,4 +172,25 @@ function createButton(name, isActive = false, shadowRoot) {
   });
 
   return btn;
+}
+function waitForVideos(callback) {
+  const container = document.querySelector("ytd-section-list-renderer");
+  if (!container) return;
+  const videoList = container.querySelector("#contents");
+  console.log("MutationObserver: ", videoList);
+
+  let block = 26;
+  // it's intially 26 then increments by 30 but what if we are left with only 20 or < our length like the last x
+
+  const observer = new MutationObserver(() => {
+    const videos = container.querySelectorAll("ytd-video-renderer");
+
+    if (videos.length >= block) {
+      // observer.disconnect();
+      block += 30;
+      callback(videos);
+    }
+  });
+
+  observer.observe(container, { childList: true, subtree: true });
 }
