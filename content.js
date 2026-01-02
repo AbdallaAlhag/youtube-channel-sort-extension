@@ -1,3 +1,9 @@
+// TODO:
+// [ ] v1: Sort the list then resort when we get another section .
+// [ ] v1-1: scroll down to get full list then sort
+// [ ] v2: fetch the full list and then sort
+
+let originalOrder = [];
 let lastUrl = location.href;
 console.log("content script loaded");
 
@@ -31,8 +37,16 @@ function onChannelSearchPage() {
   // }, 2000);
   waitForVideos((videos) => {
     console.log("STABLE video count:", videos.length);
+    console.log("vidoes: ", videos);
+    console.dir(videos[0]);
+
+    // update original order , but watch out for duplicates.
+    originalOrder = originalOrder.concat(videos);
+    let vidoeData = [...videos].map((v) => extractVideoData(v));
+    console.log("completed video data list: ", vidoeData);
   });
   // grab current videos.
+  // video info is in vidoeELment => first child => 2nd child => first child => 2nd child => first child => second child
 }
 
 function handleRouteChange() {
@@ -193,4 +207,97 @@ function waitForVideos(callback) {
   });
 
   observer.observe(container, { childList: true, subtree: true });
+}
+
+// video info is in vidoeELment => first child => 2nd child => first child => 2nd child => first child => second child
+function extractVideoData(el) {
+  // console.log(el);
+  // every video should have views and date , except playlist which we will throw out
+
+  // let data =
+  //   el.firstChild?.children?.[1]?.firstChild?.children?.[1]?.firstChild
+  //     ?.children?.[1];
+  let first = el.firstElementChild;
+  let second = first.children[1];
+  let third = second.firstElementChild;
+  let fourth = third.children[1];
+  let fifth = fourth.firstElementChild;
+  let sixth = fifth.children[1];
+  let dataNode = sixth.querySelectorAll("span");
+  let views = convertViews(dataNode[0].innerText);
+  let date = convertDate(dataNode[1].innerText);
+  // console.log(views, date);
+
+  // either query select the data I want to check each child for the element one by one
+  // just return nothing
+  // console.log(data);
+  // Maybe sort by title or duration in the future?
+  //asdfadsf
+  return {
+    el,
+    views,
+    date,
+  };
+}
+
+function convertDate(date) {
+  // videos will have x years, x months, x days, x hours ago, x minutes ago , x seconds
+  let string = date.split("ago");
+  let value = string[0].trim().split(" ");
+  let numberVariable = value[0];
+  let timeVariable = value[1];
+
+  let today = new Date();
+  let convertedTime = new Date(today);
+  // let functionMap = {
+  //   "years": today.getFullYear,
+  //   "months": today.getMonth,
+  //   "days": today.getDate,
+  //   "hours": today.getHours,
+  //   "seconds": today.getSeconds,
+  // }
+  // if (functionMap.hasOwn(timeVariable)){
+  //   convertedTime =
+  // }
+  switch (timeVariable) {
+    case "years":
+      convertedTime.setFullYear(today.getFullYear() - numberVariable);
+      break;
+    case "months":
+      convertedTime.setMonth(today.getMonth() - numberVariable);
+      break;
+    case "days":
+      convertedTime.setDate(today.getDate() - numberVariable);
+      break;
+    case "hours":
+      convertedTime.setHours(today.getHours() - numberVariable);
+      break;
+    case "minutes":
+      convertedTime.setMinutes(today.getMinutes() - numberVariable);
+      break;
+    case "seconds":
+      convertedTime.setSeconds(today.getSeconds() - numberVariable);
+      break;
+    default:
+      console.log("no time");
+  }
+  return convertedTime;
+}
+function convertViews(view) {
+  // B = billion, M = million, K = thousands, nothig = under 1000
+  if (!view.includes("views")) return number(view);
+  let string = view.split("views")[0].trim();
+  let stringVariable = string.slice(-1);
+  let numberVariable = string.slice(0, -1);
+
+  switch (stringVariable) {
+    case "B":
+      return numberVariable * 1000000000;
+    case "M":
+      return numberVariable * 1000000;
+    case "K":
+      return numberVariable * 1000;
+    default:
+      return numberVariable;
+  }
 }
