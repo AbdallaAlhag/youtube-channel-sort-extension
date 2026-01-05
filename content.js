@@ -4,6 +4,7 @@
 // [ ] v2: fetch the full list and then sort
 
 let originalOrder = [];
+let VIDEO_LIST = [];
 let lastUrl = location.href;
 console.log("content script loaded");
 
@@ -42,8 +43,8 @@ function onChannelSearchPage() {
 
     // update original order , but watch out for duplicates.
     originalOrder = originalOrder.concat(videos);
-    let vidoeData = [...videos].map((v) => extractVideoData(v));
-    console.log("completed video data list: ", vidoeData);
+    VIDEO_LIST = [...videos].map((v) => extractVideoData(v));
+    console.log("completed video data list: ", VIDEO_LIST);
   });
   // grab current videos.
   // video info is in vidoeELment => first child => 2nd child => first child => 2nd child => first child => second child
@@ -185,6 +186,7 @@ function createButton(name, isActive = false, shadowRoot) {
     btn.classList.add("active");
   });
 
+  btn.addEventListener("click", () => sortVideos(name));
   return btn;
 }
 function waitForVideos(callback) {
@@ -300,4 +302,41 @@ function convertViews(view) {
     default:
       return numberVariable;
   }
+}
+
+function sortVideos(type) {
+  console.log("type: ", type);
+  let sorted;
+  switch (type) {
+    case "Popular":
+      sorted = VIDEO_LIST.sort((a, b) => b.views - a.views);
+      break;
+    case "Oldest":
+      sorted = VIDEO_LIST.sort((a, b) => b.date - a.date);
+      break;
+    case "Latest":
+      sorted = VIDEO_LIST.sort((a, b) => a.date - b.date);
+      break;
+    case "Default":
+      restoreOriginalOrder();
+      return;
+  }
+  console.log("sorted: ", sorted);
+  console.log("VIDEO_LIST", VIDEO_LIST);
+  applyOrder(sorted);
+}
+
+function applyOrder(sortedVideos) {
+  if (!Array.isArray(sortedVideos)) {
+    console.error("sortedVideos is not an array:", sortedVideos);
+    return;
+  }
+  console.log(sortedVideos);
+  const videoContainer = [
+    ...document.querySelectorAll("ytd-two-column-browse-results-renderer"),
+  ];
+  let primaryContainer = videoContainer[0].firstElementChild;
+  sortedVideos.forEach((video) => {
+    primaryContainer.appendChild(video.el);
+  });
 }
