@@ -3,6 +3,13 @@
 // [ ] v1-1: scroll down to get full list then sort
 // [ ] v2: fetch the full list and then sort
 
+// takes a couple minutes to load not quite what we are looking for
+// const observer2 = new MutationObserver(() => {
+//   window.scrollBy(0, 1000);
+// });
+//
+// observer2.observe(document.body, { childList: true, subtree: true });
+
 let originalOrder = [];
 let VIDEO_LIST = [];
 let lastUrl = location.href;
@@ -30,21 +37,15 @@ function onChannelSearchPage() {
   // setTimeout(setUpButtons, 1000); // only problem is that this can be called twice if not intialized quickly
   setUpButtons(); // while this gets called a little to fast lol
 
-  // const videoElements = [...document.querySelectorAll("ytd-video-renderer")];
-  // let videoElements;
-  // setTimeout(() => {
-  //   videoElements = document.querySelectorAll("ytd-video-renderer");
-  //   console.log("videoElements", videoElements.length);
-  // }, 2000);
   waitForVideos((videos) => {
-    console.log("STABLE video count:", videos.length);
-    console.log("vidoes: ", videos);
-    console.dir(videos[0]);
+    // console.log("STABLE video count:", videos.length);
+    // console.log("videos: ", videos);
+    // console.dir(videos[0]);
 
-    // update original order , but watch out for duplicates.
-    originalOrder = originalOrder.concat(videos);
-    VIDEO_LIST = [...videos].map((v) => extractVideoData(v));
-    console.log("completed video data list: ", VIDEO_LIST);
+    // VIDEO_LIST = [...videos].map((v) => extractVideoData(v));
+    VIDEO_LIST = [...videos].map(extractVideoData).filter(Boolean);
+    // console.log("completed video data list: ", VIDEO_LIST);
+    originalOrder = Array.from(new Set(originalOrder.concat(VIDEO_LIST)));
   });
   // grab current videos.
   // video info is in vidoeELment => first child => 2nd child => first child => 2nd child => first child => second child
@@ -79,9 +80,6 @@ observer.observe(document.documentElement, { childList: true, subtree: true });
 
 function setUpButtons() {
   const container = createContainer();
-  // const videoContainer = document.querySelector(
-  //   "ytd-two-column-browse-results-renderer",
-  // );
 
   // first element is disabled
   const videoContainer = [
@@ -195,13 +193,21 @@ function waitForVideos(callback) {
   const videoList = container.querySelector("#contents");
   console.log("MutationObserver: ", videoList);
 
-  let block = 26;
+  // this only loads the first two.
+  let videos = container.querySelectorAll("ytd-video-renderer");
+  console.log("initial videos: ", videos);
+  setTimeout(() => callback(videos), 5000);
+
+  let vidoeBlock = 26;
   // it's intially 26 then increments by 30 but what if we are left with only 20 or < our length like the last x
 
   const observer = new MutationObserver(() => {
-    const videos = container.querySelectorAll("ytd-video-renderer");
+    const videosContainer = container.querySelectorAll(
+      "ytd-item-section-renderer",
+    );
 
-    if (videos.length >= block) {
+    videos = container.querySelectorAll("ytd-video-renderer");
+    if (videosContainer.length >= vidoeBlock) {
       // observer.disconnect();
       block += 30;
       callback(videos);
@@ -220,21 +226,31 @@ function extractVideoData(el) {
   //   el.firstChild?.children?.[1]?.firstChild?.children?.[1]?.firstChild
   //     ?.children?.[1];
   let first = el.firstElementChild;
+  if (!first) return null;
   let second = first.children[1];
+  if (!second) return null;
   let third = second.firstElementChild;
+  if (!third) return null;
   let fourth = third.children[1];
+  if (!fourth) return null;
   let fifth = fourth.firstElementChild;
+  if (!fifth) return null;
   let sixth = fifth.children[1];
+  if (!sixth) return null;
   let dataNode = sixth.querySelectorAll("span");
   let views = convertViews(dataNode[0].innerText);
   let date = convertDate(dataNode[1].innerText);
   // console.log(views, date);
 
+  if (views == null || date == null) {
+    // console.debug("Skipping video", el);
+    return null;
+  }
   // either query select the data I want to check each child for the element one by one
   // just return nothing
   // console.log(data);
   // Maybe sort by title or duration in the future?
-  //asdfadsf
+  el = el.parentElement;
   return {
     el,
     views,
@@ -281,13 +297,17 @@ function convertDate(date) {
       convertedTime.setSeconds(today.getSeconds() - numberVariable);
       break;
     default:
-      console.log("no time");
+      convertedTime = null;
+    // console.log("no time");
   }
   return convertedTime;
 }
 function convertViews(view) {
   // B = billion, M = million, K = thousands, nothig = under 1000
-  if (!view.includes("views")) return number(view);
+  if (!view.includes("views")) {
+    console.log("no views");
+    return null;
+  }
   let string = view.split("views")[0].trim();
   let stringVariable = string.slice(-1);
   let numberVariable = string.slice(0, -1);
@@ -305,7 +325,6 @@ function convertViews(view) {
 }
 
 function sortVideos(type) {
-  console.log("type: ", type);
   let sorted;
   switch (type) {
     case "Popular":
@@ -318,7 +337,7 @@ function sortVideos(type) {
       sorted = VIDEO_LIST.sort((a, b) => a.date - b.date);
       break;
     case "Default":
-      restoreOriginalOrder();
+      sorted = originalOrder;
       return;
   }
   console.log("sorted: ", sorted);
@@ -327,16 +346,29 @@ function sortVideos(type) {
 }
 
 function applyOrder(sortedVideos) {
-  if (!Array.isArray(sortedVideos)) {
-    console.error("sortedVideos is not an array:", sortedVideos);
+  if (sortedVideos.length === 0) {
     return;
   }
   console.log(sortedVideos);
-  const videoContainer = [
-    ...document.querySelectorAll("ytd-two-column-browse-results-renderer"),
-  ];
-  let primaryContainer = videoContainer[0].firstElementChild;
+  // const videoContainer = [
+  //   ...document.querySelectorAll("ytd-two-column-browse-results-renderer"),
+  // ];
+  const videoContainer = [...document.querySelectorAll("#contents")];
+  // const elementsToRemove = document.querySelectorAll(
+  //   "ytd-item-section-renderer",
+  // );
+  // elementsToRemove.forEach((element) => {
+  //   element.remove();
+  // });
+  // ytd - video - renderer.style - scope.ytd - item - section - renderer;
+  //ytd-item-section-renderer return this parent instead of the child above
+  // videoContainer.forEach((el) => {
+  //   if (el.id !== "yt-channel-sort-ui") {
+  //     el.remove();
+  //   }
+  // });
+  console.log(videoContainer);
   sortedVideos.forEach((video) => {
-    primaryContainer.appendChild(video.el);
+    videoContainer.appendChild(video.el);
   });
 }
